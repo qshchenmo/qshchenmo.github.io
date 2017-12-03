@@ -5,14 +5,18 @@
   
 
   
-  <title>qshchenmo&#39;s home</title>
+  <title>urcu qsbr实现原理 | qshchenmo&#39;s home</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta property="og:type" content="website">
-<meta property="og:title" content="qshchenmo&#39;s home">
-<meta property="og:url" content="https://qshchenmo.github.io/index.html">
+  <meta name="description" content="Overviewurcu全称user-space read-copy update即用户态RCU，它提供了与内核RCU相似的机制，使得在多核多线程并发访问共享数据时，reader不用阻塞于writer的操作，从而使reader运行的更快，非常适合于读多写少的场景。 urcu flavors针对不同的应用场景，urcu提">
+<meta property="og:type" content="article">
+<meta property="og:title" content="urcu qsbr实现原理">
+<meta property="og:url" content="https://qshchenmo.github.io/2017/12/03/qsbr_urcu/index.html">
 <meta property="og:site_name" content="qshchenmo&#39;s home">
+<meta property="og:description" content="Overviewurcu全称user-space read-copy update即用户态RCU，它提供了与内核RCU相似的机制，使得在多核多线程并发访问共享数据时，reader不用阻塞于writer的操作，从而使reader运行的更快，非常适合于读多写少的场景。 urcu flavors针对不同的应用场景，urcu提供了以下5种不同的flavors  QSBR(quiescent-state-b">
+<meta property="og:updated_time" content="2017-12-03T10:51:27.692Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="qshchenmo&#39;s home">
+<meta name="twitter:title" content="urcu qsbr实现原理">
+<meta name="twitter:description" content="Overviewurcu全称user-space read-copy update即用户态RCU，它提供了与内核RCU相似的机制，使得在多核多线程并发访问共享数据时，reader不用阻塞于writer的操作，从而使reader运行的更快，非常适合于读多写少的场景。 urcu flavors针对不同的应用场景，urcu提供了以下5种不同的flavors  QSBR(quiescent-state-b">
   
     <link rel="alternate" href="/atom.xml" title="qshchenmo&#39;s home" type="application/atom+xml">
   
@@ -59,9 +63,7 @@
   </div>
 </header>
       <div class="outer">
-        <section id="main">
-  
-    <article id="post-qsbr_urcu" class="article article-type-post" itemscope itemprop="blogPost">
+        <section id="main"><article id="post-qsbr_urcu" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/2017/12/03/qsbr_urcu/" class="article-date">
   <time datetime="2017-12-03T09:40:57.000Z" itemprop="datePublished">2017-12-03</time>
@@ -74,8 +76,8 @@
       <header class="article-header">
         
   
-    <h1 itemprop="name">
-      <a class="article-title" href="/2017/12/03/qsbr_urcu/">urcu qsbr实现原理</a>
+    <h1 class="article-title" itemprop="name">
+      urcu qsbr实现原理
     </h1>
   
 
@@ -152,11 +154,9 @@
     </footer>
   </div>
   
-</article>
-
-
+    
   
-
+</article>
 
 </section>
         
