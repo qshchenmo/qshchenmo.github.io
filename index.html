@@ -86,11 +86,11 @@
         <h2 id="Overview"><a href="#Overview" class="headerlink" title="Overview"></a>Overview</h2><p>urcu全称<a href="http://liburcu.org/" target="_blank" rel="noopener">user-space read-copy update</a>即用户态RCU，它提供了与内核RCU相似的机制，使得在多核多线程并发访问共享数据时，reader不用阻塞于writer的操作，从而使reader运行的更快，非常适合于读多写少的场景。</p>
 <h2 id="urcu-flavors"><a href="#urcu-flavors" class="headerlink" title="urcu flavors"></a>urcu flavors</h2><p>针对不同的应用场景，urcu提供了以下5种不同的flavors</p>
 <ul>
+<li>urcu</li>
 <li><strong>QSBR(quiescent-state-based RCU)</strong></li>
 <li>Memory-barrier-base RCU</li>
 <li>“Bullet-proof” RCU</li>
 <li>Signal-based RCU</li>
-<li>Signal-based RCU using an out-of-tree sys_membarrier() system call</li>
 </ul>
 <p>qsbr是5种flavor中<strong>读</strong>性能最好的，它也可称为显示静默期(Quiescent)声明模式,这种模式下，rcu_read_lock()和rcu_read_unlock()为空操作，对于reader来说负担为零(这一点时另外４种flavor不具备的)，但代价是，每个reader线程也必须周期性的调用rcu_quiescent_state()来声明自己进入了静默期，需要注意的是，并非每次读操作完成后都需要做此声明，考虑到读操作的性能和应用读写操作的不平衡性，通常的做法是读操作每进行一定次数(如1024)之后声明一次静默期。还有一点，每个会进入RCU-read-side critical sections的线程都需要事先通过rcu_register_thread()接口进行注册，相应的在线程推出时调用rcu_unregister_thread()接口进行去注册。</p>
 <h2 id="implement"><a href="#implement" class="headerlink" title="implement"></a>implement</h2><h5 id="global-counter-with-reader-counter"><a href="#global-counter-with-reader-counter" class="headerlink" title="global counter with reader counter"></a>global counter <em>with</em> reader counter</h5><p>前面提到过，rcu是用于多核系统中，保持各线程所看到的全局数据一致性的一种机制，所以需要一种手段可以判断当writer线程进行数据更新时，reader线程看到的数据是否也更新了，为此urcu维护了一个全局的计数器global counter,每次writer的同步操作(synchronize)，都会使rcu_gp.ctr加１,表示数据已经更新了，reader需要更新　<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">rcu_gp</span> <span class="title">rcu_gp</span>;</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">rcu_gp</span> &#123;</span></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span> ctr;</span><br><span class="line">	...</span><br><span class="line">&#125; __attribute__((aligned(CAA_CACHE_LINE_SIZE)));</span><br></pre></td></tr></table></figure></p>
@@ -146,7 +146,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://qshchenmo.github.io/2017/12/03/qsbr_urcu/" data-id="cjaqndo0e0001r16zdfe441oy" class="article-share-link">Share</a>
+      <a data-url="https://qshchenmo.github.io/2017/12/03/qsbr_urcu/" data-id="cjaqngd6o0001tf6zul72yp8x" class="article-share-link">Share</a>
       
       
     </footer>
