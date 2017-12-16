@@ -5,20 +5,20 @@
   
 
   
-  <title>urcu qsbr实现原理 | qshchenmo&#39;s home</title>
+  <title>urcu qsbr实现原理 | qshchenmo&#39;s notes</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="description" content="Overviewurcu全称user-space read-copy update即用户态RCU，它提供了与内核RCU相似的机制，使得在多核多线程并发访问共享数据时，reader不用阻塞于writer的操作，从而使reader运行的更快，非常适合于读多写少的场景。 urcu flavors针对不同的应用场景，urcu提">
 <meta property="og:type" content="article">
 <meta property="og:title" content="urcu qsbr实现原理">
 <meta property="og:url" content="https://qshchenmo.github.io/2017/12/03/qsbr_urcu/index.html">
-<meta property="og:site_name" content="qshchenmo&#39;s home">
+<meta property="og:site_name" content="qshchenmo&#39;s notes">
 <meta property="og:description" content="Overviewurcu全称user-space read-copy update即用户态RCU，它提供了与内核RCU相似的机制，使得在多核多线程并发访问共享数据时，reader不用阻塞于writer的操作，从而使reader运行的更快，非常适合于读多写少的场景。 urcu flavors针对不同的应用场景，urcu提供了以下5种不同的flavors  urcu QSBR(quiescent-st">
-<meta property="og:updated_time" content="2017-12-03T10:54:11.062Z">
+<meta property="og:updated_time" content="2017-12-16T03:07:31.725Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="urcu qsbr实现原理">
 <meta name="twitter:description" content="Overviewurcu全称user-space read-copy update即用户态RCU，它提供了与内核RCU相似的机制，使得在多核多线程并发访问共享数据时，reader不用阻塞于writer的操作，从而使reader运行的更快，非常适合于读多写少的场景。 urcu flavors针对不同的应用场景，urcu提供了以下5种不同的flavors  urcu QSBR(quiescent-st">
   
-    <link rel="alternate" href="/atom.xml" title="qshchenmo&#39;s home" type="application/atom+xml">
+    <link rel="alternate" href="/atom.xml" title="qshchenmo&#39;s notes" type="application/atom+xml">
   
   
     <link rel="icon" href="/favicon.png">
@@ -37,7 +37,7 @@
   <div id="header-outer" class="outer">
     <div id="header-title" class="inner">
       <h1 id="logo-wrap">
-        <a href="/" id="logo">qshchenmo&#39;s home</a>
+        <a href="/" id="logo">qshchenmo&#39;s notes</a>
       </h1>
       
     </div>
@@ -54,7 +54,7 @@
         
           <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
         
-        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+        <a id="nav-search-btn" class="nav-icon" title="Suche"></a>
       </nav>
       <div id="search-form-wrap">
         <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="https://qshchenmo.github.io"></form>
@@ -101,7 +101,7 @@
 <p>线程上线(online)的本质，就是将rcu_gp.ctr的值存储到本线程的ctr中<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">void</span> _rcu_thread_online(<span class="keyword">void</span>)</span><br><span class="line">&#123;</span><br><span class="line">	_CMM_STORE_SHARED(URCU_TLS(rcu_reader).ctr, CMM_LOAD_SHARED(rcu_gp.ctr));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
 <p>而线程下线(offline)，则是将本线程的ctr清零<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">void</span> _rcu_thread_offline(<span class="keyword">void</span>)</span><br><span class="line">&#123;</span><br><span class="line">	CMM_STORE_SHARED(URCU_TLS(rcu_reader).ctr, <span class="number">0</span>);</span><br><span class="line">	wake_up_gp();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
 <h5 id="writer-synchronize"><a href="#writer-synchronize" class="headerlink" title="writer synchronize"></a>writer synchronize</h5><p>rcu的一个典型的应用场景时，writer线程创建了一份新的数据后，使全局指针gp_ptr指向这片内存空间，替换原数据内存空间，在多核系统中，writer在更新后并不能确保没有reader正在使用旧的内存数据，所以它需要阻塞等待所有的reader线程已经更新(即reader.ctx等于gp.ctr)，这个操作便是synchronize，其简化版实现代码片段如下<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">synchronize_rcu</span><span class="params">(<span class="keyword">void</span>)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	CDS_LIST_HEAD(qsreaders);</span><br><span class="line">	DEFINE_URCU_WAIT_NODE(wait, URCU_WAIT_WAITING);</span><br><span class="line">    ......</span><br><span class="line">	urcu_wait_add(&amp;gp_waiters, &amp;wait) 　<span class="comment">/* 将writer自身置于wait状态　*/</span></span><br><span class="line">	......</span><br><span class="line">	wait_for_readers(®istry, &amp;cur_snap_readers, &amp;qsreaders);　<span class="comment">/* writer阻塞在这里　*/</span></span><br><span class="line">	.....</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">void</span> <span class="title">wait_for_readers</span><span class="params">(struct cds_list_head *input_readers,</span></span></span><br><span class="line"><span class="function"><span class="params">　　　　　　　　　　　　　　　　　struct cds_list_head *cur_snap_readers，</span></span></span><br><span class="line"><span class="function"><span class="params">　　　　　　　　　　　　　　　　　struct cds_list_head *qsreaders)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">int</span> wait_loops = <span class="number">0</span>;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">rcu_reader</span> *<span class="title">index</span>, *<span class="title">tmp</span>;</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">	 * Wait for each thread URCU_TLS(rcu_reader).ctr to either</span></span><br><span class="line"><span class="comment">	 * indicate quiescence (offline), or for them to observe the</span></span><br><span class="line"><span class="comment">	 * current rcu_gp.ctr value.</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="keyword">for</span> (;;) &#123;　　　　　　　　　　<span class="comment">/* 直到所有reader.ctr已经到最新才跳出循环　*/</span></span><br><span class="line">		uatomic_set(&amp;rcu_gp.futex, <span class="number">-1</span>);</span><br><span class="line">		cds_list_for_each_entry(index, input_readers, node) &#123;</span><br><span class="line">		_CMM_STORE_SHARED(index-&gt;waiting, <span class="number">1</span>);</span><br><span class="line">		</span><br><span class="line">		<span class="comment">/* 遍历所有输入的reader　*/</span></span><br><span class="line">		cds_list_for_each_entry_safe(index, tmp, input_readers, node) &#123;</span><br><span class="line">			<span class="keyword">switch</span> (rcu_reader_state(&amp;index-&gt;ctr)) &#123;</span><br><span class="line">			<span class="keyword">case</span> RCU_READER_ACTIVE_CURRENT:　　　<span class="comment">/* reader.ctr已经最新　*/</span></span><br><span class="line">			<span class="keyword">case</span> RCU_READER_INACTIVE:　　　　　　<span class="comment">/* reader处于offline状态　*/</span></span><br><span class="line">				cds_list_move(&amp;index-&gt;node, qsreaders);　<span class="comment">/* 从遍历列表中移除　*/</span></span><br><span class="line">				<span class="keyword">break</span>;</span><br><span class="line">			<span class="keyword">case</span> RCU_READER_ACTIVE_OLD:　　　　　<span class="comment">/* reader.ctr不是最新　*/</span></span><br><span class="line">				<span class="keyword">break</span>;</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">		<span class="keyword">if</span> (cds_list_empty(input_readers)) &#123;</span><br><span class="line">			uatomic_set(&amp;rcu_gp.futex, <span class="number">0</span>);　　　<span class="comment">/*　列表空了，表示所有reader已更新　跳出循环　*/</span></span><br><span class="line">			<span class="keyword">break</span>;</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
-<h5 id="reader-quiescent"><a href="#reader-quiescent" class="headerlink" title="reader quiescent"></a>reader quiescent</h5><p>从上面writer synchronize的过程可知，要使writer结束阻塞状态，reader必须为offline或者将其ctr更新到最新，这是通过调用rcu_quiescent_state()接口声明静默期完成的.<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">static inline void _rcu_quiescent_state(void)</span><br><span class="line">&#123;</span><br><span class="line">	unsigned long gp_ctr;</span><br><span class="line">	if ((gp_ctr = CMM_LOAD_SHARED(rcu_gp.ctr)) == URCU_TLS(rcu_reader).ctr)</span><br><span class="line">		return;</span><br><span class="line">	_rcu_quiescent_state_update_and_wakeup(gp_ctr);</span><br><span class="line">&#125;</span><br><span class="line">static inline void _rcu_quiescent_state_update_and_wakeup(unsigned long gp_ctr)</span><br><span class="line">&#123;</span><br><span class="line">	_CMM_STORE_SHARED(URCU_TLS(rcu_reader).ctr, gp_ctr); /* 将本线程ctr更新为gp_ctr */</span><br><span class="line">	wake_up_gp();           /* 唤醒writer */</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<h5 id="reader-quiescent"><a href="#reader-quiescent" class="headerlink" title="reader quiescent"></a>reader quiescent</h5><p>从上面writer synchronize的过程可知，要使writer结束阻塞状态，reader必须为offline或者将其ctr更新到最新，这是通过调用rcu_quiescent_state()接口声明静默期完成的.<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">void</span> _rcu_quiescent_state(<span class="keyword">void</span>)</span><br><span class="line">&#123;</span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span> gp_ctr;</span><br><span class="line">	<span class="keyword">if</span> ((gp_ctr = CMM_LOAD_SHARED(rcu_gp.ctr)) == URCU_TLS(rcu_reader).ctr)</span><br><span class="line">		<span class="keyword">return</span>;</span><br><span class="line">	_rcu_quiescent_state_update_and_wakeup(gp_ctr);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">void</span> _rcu_quiescent_state_update_and_wakeup(<span class="keyword">unsigned</span> <span class="keyword">long</span> gp_ctr)</span><br><span class="line">&#123;</span><br><span class="line">	_CMM_STORE_SHARED(URCU_TLS(rcu_reader).ctr, gp_ctr); <span class="comment">/* 将本线程ctr更新为gp_ctr */</span></span><br><span class="line">	wake_up_gp();           <span class="comment">/* 唤醒writer */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
 <h1 id="example"><a href="#example" class="headerlink" title="example"></a>example</h1><p>这个example节选自urcu官方代码的测试例程<em>test_urcu_qsbr</em><br>测试例程根据用户输入创建若干个writer和reader,writer不断申请释放内存资源，并用全局指针test_rcu_pointer记录资源，reader不断读取test_rcu_pointer指向资源的值，并且每1024次声明静默期，最后统计reader和writer的次数。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> *<span class="title">thr_writer</span><span class="params">(<span class="keyword">void</span> *_count)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span> <span class="keyword">long</span> *count = _count;</span><br><span class="line">	<span class="keyword">int</span> *<span class="keyword">new</span>, *old;</span><br><span class="line">	<span class="keyword">for</span> (;;) &#123;</span><br><span class="line">		<span class="keyword">new</span> = <span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(<span class="keyword">int</span>));</span><br><span class="line">		assert(<span class="keyword">new</span>);</span><br><span class="line">		*<span class="keyword">new</span> = <span class="number">8</span>;</span><br><span class="line">		old = rcu_xchg_pointer(&amp;test_rcu_pointer, <span class="keyword">new</span>);</span><br><span class="line"></span><br><span class="line">		synchronize_rcu();</span><br><span class="line">		<span class="keyword">if</span> (old)</span><br><span class="line">			*old = <span class="number">0</span>;</span><br><span class="line">		<span class="built_in">free</span>(old);</span><br><span class="line">		URCU_TLS(nr_writes)++;</span><br><span class="line">	&#125;</span><br><span class="line">	printf_verbose(<span class="string">"thread_end %s, tid %lu\n"</span>,</span><br><span class="line">			<span class="string">"writer"</span>, urcu_get_thread_id());</span><br><span class="line">	*count = URCU_TLS(nr_writes);</span><br><span class="line">	<span class="keyword">return</span> ((<span class="keyword">void</span>*)<span class="number">2</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> *<span class="title">thr_reader</span><span class="params">(<span class="keyword">void</span> *_count)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span> <span class="keyword">long</span> *count = _count;</span><br><span class="line">	<span class="keyword">int</span> *local_ptr;</span><br><span class="line">	</span><br><span class="line">	rcu_register_thread();</span><br><span class="line">	rcu_thread_offline();</span><br><span class="line">	rcu_thread_online();</span><br><span class="line"></span><br><span class="line">	<span class="keyword">for</span> (;;) &#123;</span><br><span class="line">		rcu_read_lock();</span><br><span class="line">		local_ptr = rcu_dereference(test_rcu_pointer);</span><br><span class="line">		<span class="keyword">if</span> (local_ptr)</span><br><span class="line">			assert(*local_ptr == <span class="number">8</span>);</span><br><span class="line">		rcu_read_unlock();</span><br><span class="line">		URCU_TLS(nr_reads)++;</span><br><span class="line">		<span class="comment">/* QS each 1024 reads */</span></span><br><span class="line">		<span class="keyword">if</span> (caa_unlikely((URCU_TLS(nr_reads) &amp; ((<span class="number">1</span> &lt;&lt; <span class="number">10</span>) - <span class="number">1</span>)) == <span class="number">0</span>))</span><br><span class="line">			rcu_quiescent_state();</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	rcu_unregister_thread();</span><br><span class="line"></span><br><span class="line">	*count = URCU_TLS(nr_reads);</span><br><span class="line">	printf_verbose(<span class="string">"thread_end %s, tid %lu\n"</span>,</span><br><span class="line">			<span class="string">"reader"</span>, urcu_get_thread_id());</span><br><span class="line">	<span class="keyword">return</span> ((<span class="keyword">void</span>*)<span class="number">1</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <h1 id="perfomance"><a href="#perfomance" class="headerlink" title="perfomance"></a>perfomance</h1><table>
@@ -148,13 +148,27 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://qshchenmo.github.io/2017/12/03/qsbr_urcu/" data-id="cjaqngd6o0001tf6zul72yp8x" class="article-share-link">Share</a>
+      <a data-url="https://qshchenmo.github.io/2017/12/03/qsbr_urcu/" data-id="cjaqngd6o0001tf6zul72yp8x" class="article-share-link">Teilen</a>
       
       
     </footer>
   </div>
   
     
+<nav id="article-nav">
+  
+    <a href="/2017/12/16/network_subsystem_1/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Neuer</strong>
+      <div class="article-nav-title">
+        
+          new post
+        
+      </div>
+    </a>
+  
+  
+</nav>
+
   
 </article>
 
@@ -172,7 +186,7 @@
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Archives</h3>
+    <h3 class="widget-title">Archiv</h3>
     <div class="widget">
       <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">December 2017</a></li></ul>
     </div>
@@ -182,9 +196,13 @@
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Recent Posts</h3>
+    <h3 class="widget-title">letzter Beitrag</h3>
     <div class="widget">
       <ul>
+        
+          <li>
+            <a href="/2017/12/16/network_subsystem_1/">new post</a>
+          </li>
         
           <li>
             <a href="/2017/12/03/qsbr_urcu/">urcu qsbr实现原理</a>
@@ -202,7 +220,7 @@
   
   <div class="outer">
     <div id="footer-info" class="inner">
-      &copy; 2017 John Doe<br>
+      &copy; 2017 liuyacan<br>
       Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
     </div>
   </div>
