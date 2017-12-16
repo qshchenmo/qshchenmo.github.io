@@ -5,17 +5,17 @@
   
 
   
-  <title>new post | qshchenmo&#39;s notes</title>
+  <title>内核网络子系统情景分析（一）：驱动接收数据包 | qshchenmo&#39;s notes</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="description" content="#内核网络子系统情景分析（一）：驱动接收数据包##环境内核版本:4.14.6网卡型号:Qualcomm Atheros QCA8171 Gigabit Ethernet (rev 10)驱动路径:/drivers/net/ethernet/atheros/alx ##过程概览０．在系统启动时，加载网卡驱动，设置硬件，注">
 <meta property="og:type" content="article">
-<meta property="og:title" content="new post">
+<meta property="og:title" content="内核网络子系统情景分析（一）：驱动接收数据包">
 <meta property="og:url" content="https://qshchenmo.github.io/2017/12/16/network_subsystem_1/index.html">
 <meta property="og:site_name" content="qshchenmo&#39;s notes">
 <meta property="og:description" content="#内核网络子系统情景分析（一）：驱动接收数据包##环境内核版本:4.14.6网卡型号:Qualcomm Atheros QCA8171 Gigabit Ethernet (rev 10)驱动路径:/drivers/net/ethernet/atheros/alx ##过程概览０．在系统启动时，加载网卡驱动，设置硬件，注册硬中断１．网卡收到数据包，中断上半部处理２．softirq中断下半部处理 ０.">
-<meta property="og:updated_time" content="2017-12-16T08:04:29.213Z">
+<meta property="og:updated_time" content="2017-12-16T08:12:58.553Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="new post">
+<meta name="twitter:title" content="内核网络子系统情景分析（一）：驱动接收数据包">
 <meta name="twitter:description" content="#内核网络子系统情景分析（一）：驱动接收数据包##环境内核版本:4.14.6网卡型号:Qualcomm Atheros QCA8171 Gigabit Ethernet (rev 10)驱动路径:/drivers/net/ethernet/atheros/alx ##过程概览０．在系统启动时，加载网卡驱动，设置硬件，注册硬中断１．网卡收到数据包，中断上半部处理２．softirq中断下半部处理 ０.">
   
     <link rel="alternate" href="/atom.xml" title="qshchenmo&#39;s notes" type="application/atom+xml">
@@ -66,7 +66,7 @@
         <section id="main"><article id="post-network_subsystem_1" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/2017/12/16/network_subsystem_1/" class="article-date">
-  <time datetime="2017-12-16T08:04:05.000Z" itemprop="datePublished">2017-12-16</time>
+  <time datetime="2017-12-16T08:12:15.000Z" itemprop="datePublished">2017-12-16</time>
 </a>
     
   </div>
@@ -77,7 +77,7 @@
         
   
     <h1 class="article-title" itemprop="name">
-      new post
+      内核网络子系统情景分析（一）：驱动接收数据包
     </h1>
   
 
@@ -107,7 +107,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://qshchenmo.github.io/2017/12/16/network_subsystem_1/" data-id="cjb92981f0001d16zqsm3rtla" class="article-share-link">Teilen</a>
+      <a data-url="https://qshchenmo.github.io/2017/12/16/network_subsystem_1/" data-id="cjb92cx7s0002ev6zmeqcad5m" class="article-share-link">Teilen</a>
       
       
     </footer>
@@ -156,7 +156,7 @@
       <ul>
         
           <li>
-            <a href="/2017/12/16/network_subsystem_1/">new post</a>
+            <a href="/2017/12/16/network_subsystem_1/">内核网络子系统情景分析（一）：驱动接收数据包</a>
           </li>
         
           <li>
