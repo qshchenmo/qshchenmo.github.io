@@ -53,7 +53,7 @@
         
           <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
         
-        <a id="nav-search-btn" class="nav-icon" title="Suche"></a>
+        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
       </nav>
       <div id="search-form-wrap">
         <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="https://qshchenmo.github.io"></form>
@@ -63,6 +63,49 @@
 </header>
       <div class="outer">
         <section id="main">
+  
+    <article id="post-network_subsystem_2" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2017/12/17/network_subsystem_2/" class="article-date">
+  <time datetime="2017-12-17T09:06:00.000Z" itemprop="datePublished">2017-12-17</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2017/12/17/network_subsystem_2/">内核网络子系统情景分析（二）从链路层到网络层</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>##环境<br>内核版本:<strong>4.14.6</strong></p>
+<h3 id="从链路层到网络层"><a href="#从链路层到网络层" class="headerlink" title="从链路层到网络层"></a>从链路层到网络层</h3><p>在内核中，一个protocol表示为一个packet_type，数据结构如下所示，每种协议有各自的的处理过程，称之为func。在系统初始化时，各个内核支持的protocol完成packet_type的注册(使用dev_add_pack)。一旦有数据包到来，提取其L2层头的protocol字段，调用对应的func处理。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">packet_type</span> &#123;</span></span><br><span class="line">	__be16			type;	<span class="comment">/* This is really htons(ether_type). */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">net_device</span>	*<span class="title">dev</span>;</span>	<span class="comment">/* NULL is wildcarded here	     */</span></span><br><span class="line">	<span class="keyword">int</span>			(*func) (struct sk_buff *,</span><br><span class="line">					     struct net_device *,</span><br><span class="line">				   	     struct packet_type *,</span><br><span class="line">					     struct net_device *);</span><br><span class="line">	<span class="keyword">bool</span>			     (*id_match)(struct packet_type *ptype, struct sock *sk);</span><br><span class="line">	<span class="keyword">void</span>	    *af_packet_priv;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span>	<span class="title">list</span>;</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure></p>
+<p>先来看看protocol的注册过程，type为ETH_P_ALL的protocol会挂在<strong>ptype_all</strong>上，其余type会hash到<strong>ptype_base</strong>上<br>注意，ETH_P_ALL并不是一个真正的protocol，它存在的意义是为一些sniffer监听所有类型的报文<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> struct list_head *<span class="title">ptype_head</span><span class="params">(<span class="keyword">const</span> struct packet_type *pt)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="keyword">if</span> (pt-&gt;type == htons(ETH_P_ALL))</span><br><span class="line">	    <span class="comment">/**/</span></span><br><span class="line">		<span class="keyword">return</span> pt-&gt;dev ? &amp;pt-&gt;dev-&gt;ptype_all : &amp;ptype_all;</span><br><span class="line">	<span class="keyword">else</span></span><br><span class="line">		<span class="keyword">return</span> pt-&gt;dev ? &amp;pt-&gt;dev-&gt;ptype_specific :</span><br><span class="line">				 &amp;ptype_base[ntohs(pt-&gt;type) &amp; PTYPE_HASH_MASK];</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">dev_add_pack</span><span class="params">(struct packet_type *pt)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> *<span class="title">head</span> = <span class="title">ptype_head</span>(<span class="title">pt</span>);</span></span><br><span class="line"></span><br><span class="line">	spin_lock(&amp;ptype_lock);</span><br><span class="line">	list_add_rcu(&amp;pt-&gt;<span class="built_in">list</span>, head);</span><br><span class="line">	spin_unlock(&amp;ptype_lock);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>完成注册后，<strong>ptype_base</strong>和<strong>ptype_all</strong>的示意图如下(图片取自《understanding linux network internals》)<br><img src="/img/network_2_2.png" alt="“protocol”"><br>上一篇说到driver的接收函数中，从sk_buff中提取出了protocol，调用netif_receive_skb开始进行协议栈的处理。<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">netif_receive_skb(struct sk_buff *skb)</span><br><span class="line">　-&gt;netif_receive_skb_internal(skb)</span><br><span class="line">　　-&gt;__netif_receive_skb(skb)</span><br><span class="line">　　  -&gt;__netif_receive_skb_core(skb, <span class="literal">false</span>)</span><br><span class="line"></span><br><span class="line"><span class="keyword">static</span> <span class="keyword">int</span> __netif_receive_skb_core(struct sk_buff *skb, <span class="keyword">bool</span> pfmemalloc=<span class="literal">false</span>)</span><br><span class="line">&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">packet_type</span> *<span class="title">ptype</span>, </span></span><br><span class="line"><span class="class">	__<span class="title">be16</span> <span class="title">type</span>;</span></span><br><span class="line">	</span><br><span class="line">	orig_dev = skb-&gt;dev;</span><br><span class="line">	</span><br><span class="line">	<span class="comment">/* 将sk_buff中的各层header复位　*/</span></span><br><span class="line">	skb_reset_network_header(skb);</span><br><span class="line">	skb_reset_transport_header(skb);</span><br><span class="line">	skb_reset_mac_len(skb);</span><br><span class="line"></span><br><span class="line">	__this_cpu_inc(softnet_data.processed);</span><br><span class="line">	<span class="comment">/*　取出sk_buff中的protocol字段　*/</span></span><br><span class="line">    type = skb-&gt;protocol;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/*　递交给hash值与type相同的链表 */</span></span><br><span class="line">    deliver_ptype_list_skb(skb, &amp;pt_prev, orig_dev, type,</span><br><span class="line">				           &amp;ptype_base[ntohs(type) &amp; PTYPE_HASH_MASK]);</span><br><span class="line">	......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>deliver_ptype_list_skb将在ptype_base[ntohs(type) &amp; PTYPE_HASH_MASK]内部进行遍历，找到type完全相同的protocol<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">void</span> <span class="title">deliver_ptype_list_skb</span><span class="params">(struct sk_buff *skb,</span></span></span><br><span class="line"><span class="function"><span class="params">					  struct packet_type **pt,</span></span></span><br><span class="line"><span class="function"><span class="params">					  struct net_device *orig_dev,</span></span></span><br><span class="line"><span class="function"><span class="params">					  __be16 type,</span></span></span><br><span class="line"><span class="function"><span class="params">					  struct list_head *ptype_list)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">packet_type</span> *<span class="title">ptype</span>, *<span class="title">pt_prev</span> = *<span class="title">pt</span>;</span></span><br><span class="line"></span><br><span class="line">	list_for_each_entry_rcu(ptype, ptype_list, <span class="built_in">list</span>) &#123;</span><br><span class="line">	    <span class="comment">/* 在链表内部进行比较，找到确定的protocol　*/</span></span><br><span class="line">		<span class="keyword">if</span> (ptype-&gt;type != type)</span><br><span class="line">			<span class="keyword">continue</span>;</span><br><span class="line">		<span class="keyword">if</span> (pt_prev)</span><br><span class="line">		    <span class="comment">/*　将sk_buff递交给该protocol */</span></span><br><span class="line">			deliver_skb(skb, pt_prev, orig_dev);</span><br><span class="line">		pt_prev = ptype;</span><br><span class="line">	&#125;</span><br><span class="line">	*pt = pt_prev;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>最终该protocol注册的func被调用<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">int</span> <span class="title">deliver_skb</span><span class="params">(struct sk_buff *skb,</span></span></span><br><span class="line"><span class="function"><span class="params">			      struct packet_type *pt_prev,</span></span></span><br><span class="line"><span class="function"><span class="params">			      struct net_device *orig_dev)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	refcount_inc(&amp;skb-&gt;users);</span><br><span class="line">	<span class="keyword">return</span> pt_prev-&gt;func(skb, skb-&gt;dev, pt_prev, orig_dev);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>以最通用的网络层协议IPv4为例，在其初始化时,通过dev_add_pack注册ip_packet_type，也就是说，如果网卡收到了链路层头为ETH_P_IP类型的数据，最终网络层会调用ip_rcv<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="class"><span class="keyword">struct</span> <span class="title">packet_type</span> <span class="title">ip_packet_type</span>　= &#123;</span></span><br><span class="line">	.type = cpu_to_be16(ETH_P_IP),</span><br><span class="line">	.func = ip_rcv,</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">int</span> <span class="title">inet_init</span><span class="params">(<span class="keyword">void</span>)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    ....</span><br><span class="line">	dev_add_pack(&amp;ip_packet_type);</span><br><span class="line">    ....</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://qshchenmo.github.io/2017/12/17/network_subsystem_2/" data-id="cjbajsto10004kc6zqpizrtjd" class="article-share-link">Share</a>
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
   
     <article id="post-network_subsystem_1" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
@@ -106,7 +149,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://qshchenmo.github.io/2017/12/16/network_subsystem_1/" data-id="cjb92cx7s0002ev6zmeqcad5m" class="article-share-link">Teilen</a>
+      <a data-url="https://qshchenmo.github.io/2017/12/16/network_subsystem_1/" data-id="cjbajstny0002kc6zvktmbina" class="article-share-link">Share</a>
       
       
     </footer>
@@ -201,7 +244,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://qshchenmo.github.io/2017/12/03/qsbr_urcu/" data-id="cjb92cx7u0003ev6zc1f6snfy" class="article-share-link">Teilen</a>
+      <a data-url="https://qshchenmo.github.io/2017/12/03/qsbr_urcu/" data-id="cjbajsto60005kc6zga4e3l48" class="article-share-link">Share</a>
       
       
     </footer>
@@ -227,7 +270,7 @@
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Archiv</h3>
+    <h3 class="widget-title">Archives</h3>
     <div class="widget">
       <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">December 2017</a></li></ul>
     </div>
@@ -237,9 +280,13 @@
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">letzter Beitrag</h3>
+    <h3 class="widget-title">Recent Posts</h3>
     <div class="widget">
       <ul>
+        
+          <li>
+            <a href="/2017/12/17/network_subsystem_2/">内核网络子系统情景分析（二）从链路层到网络层</a>
+          </li>
         
           <li>
             <a href="/2017/12/16/network_subsystem_1/">内核网络子系统情景分析（一）：驱动接收数据包</a>
